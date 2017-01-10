@@ -1794,12 +1794,19 @@ ngx_http_graphite_timer_event_handler(ngx_event_t *ev) {
         char *next = NULL;
         char *nl = NULL;
 
-        int fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (fd < 0) {
             ngx_log_error(NGX_LOG_ALERT, ev->log, 0, "graphite can't create socket");
             if (!(ngx_quit || ngx_terminate || ngx_exiting))
                 ngx_add_timer(ev, gmcf->frequency);
             return;
+        }
+
+        if (connect(fd, (struct sockaddr *) &sin, sizeof(sin)) < 0 ) {
+            ngx_log_error(NGX_LOG_ALERT, ev->log, 0, "graphite can't connect to the server");
+             if (!(ngx_quit || ngx_terminate || ngx_exiting))
+                 ngx_add_timer(ev, gmcf->frequency);
+             return;
         }
 
         while (*part) {
@@ -1813,8 +1820,9 @@ ngx_http_graphite_timer_event_handler(ngx_event_t *ev) {
 
             if (nl > part) {
 
-                if (sendto(fd, part, nl - part + 1, 0, (struct sockaddr*)&sin, sizeof(sin)) == -1)
-                    ngx_log_error(NGX_LOG_ALERT, ev->log, 0, "graphite can't send udp packet");
+                if (send(fd, part, nl - part + 1, 0) < 0) {
+                    ngx_log_error(NGX_LOG_ALERT, ev->log, 0, "graphite can't send tcp packet");
+                }
             }
             else {
                 ngx_log_error(NGX_LOG_ALERT, ev->log, 0, "graphite package size too small, need send %z", (size_t)(next - part));
