@@ -1795,6 +1795,7 @@ ngx_http_graphite_timer_event_handler(ngx_event_t *ev) {
         char *nl = NULL;
 
         int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        setNonblocking(fd);
         if (fd < 0) {
             ngx_log_error(NGX_LOG_ALERT, ev->log, 0, "graphite can't create socket");
             if (!(ngx_quit || ngx_terminate || ngx_exiting))
@@ -2154,4 +2155,18 @@ static double
 ngx_http_graphite_aggregate_sum(const ngx_http_graphite_interval_t *interval, const ngx_http_graphite_acc_t *acc) {
 
     return acc->value;
+}
+
+int setNonblocking(int fd)
+{
+    int flags;
+#if defined(O_NONBLOCK)
+    if (-1 == (flags = fcntl(fd, F_GETFL, 0)))
+        flags = 0;
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#else
+    /* Otherwise, use the old way of doing it */
+    flags = 1;
+    return ioctl(fd, FIOBIO, &flags);
+#endif
 }
